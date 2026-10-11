@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -66,8 +67,12 @@ public:
     static std::size_t hash(std::string_view key) noexcept;
 
 private:
-    // ===== YOUR REPRESENTATION GOES HERE =====
-    // Your buckets, your element count, and any private helpers you want
-    // (for example a rehash function). Store std::unique_ptr<Tool> in the
-    // buckets so that pointers handed out by find() survive a resize.
+    struct Entry {
+        std::string name;
+        std::unique_ptr<Tool> tool;
+    };
+
+    std::vector<std::vector<Entry>> buckets_;
+    std::size_t size_ = 0;
+    void grow();
 };
