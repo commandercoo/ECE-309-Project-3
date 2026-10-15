@@ -25,3 +25,11 @@ The scale test still needs to check this choice against the weak hash.
 ## Keeping pointers valid
 
 Each entry owns its tool through unique_ptr. Resizing moves the owner, not the actual tool, so pointers from find() still point to the same object. Growth counts the new bucket sizes and reserves space before moving entries. That's an extra pass, but allocation failures during preparation leave the old table alone. A rejected duplicate deletes only the incoming tool.
+
+## Workspace paths
+
+The path check follows the spec's order: reject empty strings, NUL bytes, and rooted paths, then normalize. Only a leading `..` after normalization means an escape. Looking for `..` anywhere would wrongly reject `my..notes.txt`. This function only checks text; the provided symlink check handles actual links before file access.
+
+## Errors as values
+
+A model asking for a forbidden path isn't a C++ bug. Returning false with a reason lets it read the error and try again. Exceptions make more sense for programmer mistakes, such as reading a JSON number as a string. The dispatcher catches exceptions that escape a tool as a last check.
