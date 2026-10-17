@@ -30,6 +30,18 @@ Each entry owns its tool through unique_ptr. Resizing moves the owner, not the a
 
 The path check follows the spec's order: reject empty strings, NUL bytes, and rooted paths, then normalize. Only a leading `..` after normalization means an escape. Looking for `..` anywhere would wrongly reject `my..notes.txt`. This function only checks text; the provided symlink check handles actual links before file access.
 
+## Calculator trace
+
+The calculator uses two vectors as stacks. For `2 * (3 + 4) - 5`, reading `2` leaves values `[2]`. Reading `*`, then `(`, leaves operators `[*, (]`. Reading `3` gives values `[2, 3]`; `+` makes operators `[*, (, +]`. Reading `4` gives `[2, 3, 4]`.
+
+At `)`, I pop 4 as the right operand and 3 as the left, add them, and remove `(`. Now values are `[2, 7]` and operators are `[*]`. When `-` arrives, multiplication runs first, leaving `[14]`, then minus is pushed. Reading `5` gives `[14, 5]`. The final subtraction leaves `[9]`.
+
+Equal precedence runs immediately too, which keeps subtraction and division left to right. Everything uses loops, so deep parentheses don't add recursive calls.
+
 ## Errors as values
 
-A model asking for a forbidden path isn't a C++ bug. Returning false with a reason lets it read the error and try again. Exceptions make more sense for programmer mistakes, such as reading a JSON number as a string. The dispatcher catches exceptions that escape a tool as a last check.
+A model asking for a forbidden path isn't a C++ bug. Returning false with a reason lets it read the error and try again. The calculator does the same for division by zero. Exceptions make more sense for programmer mistakes, such as reading a JSON number as a string. The dispatcher catches exceptions that escape a tool as a last check.
+
+## What I'd change
+
+Insertion hashes the same name twice, and statistics scan every bucket when requested. I'd reuse the insertion hash first if speed became an issue. The calculator's vectors also grow as needed instead of reserving space up front. These choices do a little extra work, but keep the code straightforward.
