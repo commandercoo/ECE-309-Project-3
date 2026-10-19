@@ -20,7 +20,14 @@ The hash is FNV-1a with the standard 64-bit starting value, 14695981039346656037
 
 Doubling is the same basic idea as P2's growing array. The earlier table sizes form a geometric sum, so moving entries across all resizes takes O(n) work overall. That gives amortized O(1) insertion with a good hash and bounded name lengths. Longer names still take longer to hash.
 
-The scale test still needs to check this choice against the weak hash.
+The 10,000-tool test gave these numbers at 16,384 buckets and a load factor of 0.61035156:
+
+| Hash | Longest chain |
+|---|---:|
+| FNV-1a | 6 |
+| First character plus length | 9,000 |
+
+FNV-1a produced 10,000 distinct full hashes too. The weak hash groups all four-digit suffixes together. Adding buckets doesn't help when the hash keeps giving those names the same value.
 
 ## Keeping pointers valid
 
@@ -41,6 +48,10 @@ Equal precedence runs immediately too, which keeps subtraction and division left
 ## Errors as values
 
 A model asking for a forbidden path isn't a C++ bug. Returning false with a reason lets it read the error and try again. The calculator does the same for division by zero. Exceptions make more sense for programmer mistakes, such as reading a JSON number as a string. The dispatcher catches exceptions that escape a tool as a last check.
+
+## Checking it
+
+The registry tests check collisions, duplicates, destruction counts, and all 10,000 saved pointers after resizing.
 
 ## What I'd change
 
