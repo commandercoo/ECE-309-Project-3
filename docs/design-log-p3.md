@@ -51,7 +51,7 @@ A model asking for a forbidden path isn't a C++ bug. Returning false with a reas
 
 ## Checking it
 
-The registry tests check collisions, duplicates, destruction counts, and all 10,000 saved pointers after resizing.
+The registry tests check collisions, duplicates, destruction counts, and all 10,000 saved pointers after resizing. Path tests cover every required case, missing paths, and escapes through file tools and symlinks.
 
 ## What I'd change
 

@@ -8,6 +8,7 @@
 #include "../test_helpers.h"     // TempDir, write_text, args1, ...
 
 #include "tools/calculator.h"
+#include "tools/file_tools.h"
 #include "tools/tool_registry.h"
 #include "tools/workspace.h"
 
@@ -265,6 +266,132 @@ TEST(reg_uses_whole_key) {
     const std::string padded = "prefix trailing bytes";
     CHECK(r.find(std::string_view(padded.data(), 6)) == r.find("prefix"));
     CHECK(r.find("a") == nullptr);
+}
+
+
+TEST(ws_normalizes_relative_paths) {
+    TempDir d;
+    Workspace ws(d.path());
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"notes/todo.txt", "notes/todo.txt"},
+        {"./notes//todo.txt", "notes/todo.txt"},
+        {"a/../b", "b"},
+        {"my..notes.txt", "my..notes.txt"},
+        {"folder with spaces/a.txt", "folder with spaces/a.txt"},
+    };
+    for (const auto& item : cases) {
+        fs::path out;
+        std::string reason = "previous error";
+        REQUIRE(ws.resolve(item.first, &out, &reason));
+        CHECK(out == ws.root() / item.second);
+        CHECK(reason.empty());
+    }
+}
+
+TEST(ws_dot_and_cancelled_directory_are_root) {
+    TempDir d;
+    Workspace ws(d.path());
+    for (const char* text : {".", "a/..", "./", "a/b/../.."}) {
+        fs::path out;
+        std::string reason;
+        REQUIRE(ws.resolve(text, &out, &reason));
+        CHECK(out == ws.root());
+    }
+}
+
+TEST(ws_accepts_missing_paths_without_creating_them) {
+    TempDir d;
+    // Even the workspace itself need not exist for lexical resolution.
+    Workspace ws(d.path() / "not_created");
+    fs::path out;
+    std::string reason;
+    REQUIRE(ws.resolve("new/dir/file.txt", &out, &reason));
+    CHECK(out == ws.root() / "new/dir/file.txt");
+    CHECK(!fs::exists(out));
+    CHECK(!fs::exists(ws.root()));
+}
+
+TEST(ws_rejects_empty_path) {
+    TempDir d;
+    Workspace ws(d.path());
+    fs::path out = "unchanged";
+    std::string reason;
+    CHECK(!ws.resolve("", &out, &reason));
+    CHECK(reason == "empty path");
+    CHECK(out == "unchanged");
+}
+
+TEST(ws_rejects_embedded_nul) {
+    TempDir d;
+    Workspace ws(d.path());
+    fs::path out = "unchanged";
+    std::string reason;
+    const std::string path = std::string("notes") + '\0' + "/x";
+    CHECK(!ws.resolve(path, &out, &reason));
+    CHECK(!reason.empty());
+    CHECK(out == "unchanged");
+}
+
+TEST(ws_rejects_absolute_paths) {
+    TempDir d;
+    Workspace ws(d.path());
+    for (const auto& text : std::vector<std::string>{"/etc/passwd", "/", (ws.root() / "inside.txt").string()}) {
+        fs::path out;
+        std::string reason;
+        CHECK(!ws.resolve(text, &out, &reason));
+        CHECK(!reason.empty());
+    }
+}
+
+TEST(ws_rejects_dotdot_and_reentry) {
+    TempDir d;
+    Workspace ws(d.path() / "ws");
+    for (const char* text : {"..", "../etc/passwd", "a/../../b", "notes/../../ws/notes/todo.txt"}) {
+        fs::path out = "unchanged";
+        std::string reason;
+        CHECK(!ws.resolve(text, &out, &reason));
+        CHECK(!reason.empty());
+        CHECK(out == "unchanged");
+    }
+}
+
+TEST(ws_file_tools_reject_escapes) {
+    TempDir d;
+    ToolContext ctx(Workspace(d.path() / "ws"));
+    fs::create_directory(ctx.workspace.root());
+    const fs::path outside = d.path() / "outside.txt";
+    write_text(outside, "keep this");
+    ReadFileTool reader;
+    WriteFileTool writer;
+    ListDirTool listing;
+    JsonValue args = args1("path", JsonValue::string("../outside.txt"));
+    CHECK(!reader.invoke(args, ctx).ok);
+    args.set("content", JsonValue::string("changed"));
+    CHECK(!writer.invoke(args, ctx).ok);
+    CHECK(read_text(outside) == "keep this");
+    CHECK(!listing.invoke(args1("path", JsonValue::string("..")), ctx).ok);
+}
+
+TEST(ws_symlinks_are_checked_after_resolution) {
+    TempDir d;
+    ToolContext ctx(Workspace(d.path() / "ws"));
+    fs::create_directory(ctx.workspace.root());
+    write_text(d.path() / "outside.txt", "outside");
+    fs::create_symlink(d.path() / "outside.txt", ctx.workspace.root() / "link");
+    fs::create_symlink(d.path() / "missing.txt", ctx.workspace.root() / "dangling");
+    fs::path out;
+    std::string reason;
+    REQUIRE(ctx.workspace.resolve("link", &out, &reason));
+    CHECK(out == ctx.workspace.root() / "link");
+    CHECK(!ctx.workspace.check_symlinks(out, &reason));
+    CHECK(!reason.empty());
+    ReadFileTool reader;
+    CHECK(!reader.invoke(args1("path", JsonValue::string("link")), ctx).ok);
+    WriteFileTool writer;
+    JsonValue args = args1("path", JsonValue::string("dangling"));
+    args.set("content", JsonValue::string("must not be written"));
+    CHECK(!writer.invoke(args, ctx).ok);
+    CHECK(!fs::exists(d.path() / "missing.txt"));
 }
 
 int main(int argc, char** argv) { return mt::run_all(argc, argv); }
