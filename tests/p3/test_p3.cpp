@@ -394,4 +394,111 @@ TEST(ws_symlinks_are_checked_after_resolution) {
     CHECK(!fs::exists(d.path() / "missing.txt"));
 }
 
+
+TEST(calc_left_to_right) {
+    double value = 0;
+    std::string error;
+    REQUIRE(eval("10 - 4 - 3", &value, &error));
+    CHECK(value == 3);
+    REQUIRE(eval("100 / 10 / 5", &value, &error));
+    CHECK(value == 2);
+    REQUIRE(eval("12 / 3 * 2", &value, &error));
+    CHECK(value == 8);
+}
+
+TEST(calc_parentheses) {
+    double value = 0;
+    std::string error;
+    REQUIRE(eval("(2 + 3) * 4", &value, &error));
+    CHECK(value == 20);
+    REQUIRE(eval("2 * (3 + 4) - 5", &value, &error));
+    CHECK(value == 9);
+    REQUIRE(eval("((8 - 2) / (1 + 2)) * 5", &value, &error));
+    CHECK(value == 10);
+}
+
+TEST(calc_negative_numbers) {
+    double value = 0;
+    std::string error;
+    REQUIRE(eval("-3 * -3", &value, &error));
+    CHECK(value == 9);
+    REQUIRE(eval("2 * -3 + (-1)", &value, &error));
+    CHECK(value == -7);
+    REQUIRE(eval("5 - -2", &value, &error));
+    CHECK(value == 7);
+}
+
+TEST(calc_decimals_and_division) {
+    double value = 0;
+    std::string error;
+    REQUIRE(eval("7 / 2", &value, &error));
+    CHECK(value == 3.5);
+    REQUIRE(eval("1.25 * 4 + 0.5", &value, &error));
+    CHECK(value == 5.5);
+    REQUIRE(eval(" ( 9.5 - 2.5 ) / 2\t", &value, &error));
+    CHECK(value == 3.5);
+}
+
+TEST(calc_zero_in_subexpression) {
+    double value = 123;
+    std::string error;
+    for (const char* expression : {"1 / (2 - 2)", "7 / -0", "0 / 0", "2 * (3 / (1 - 1))"}) {
+        error.clear();
+        CHECK(!eval(expression, &value, &error));
+        CHECK(error == "division by zero");
+        CHECK(value == 123);
+    }
+}
+
+TEST(calc_twenty_thousand_terms) {
+    std::string expression = "1";
+    for (int i = 1; i < 20000; ++i) expression += "+1";
+    double value = 0;
+    std::string error;
+    REQUIRE(eval(expression, &value, &error));
+    CHECK(value == 20000);
+}
+
+TEST(calc_five_thousand_parentheses) {
+    const std::string expression = std::string(5000, '(') + "2+3" + std::string(5000, ')');
+    double value = 0;
+    std::string error;
+    REQUIRE(eval(expression, &value, &error));
+    CHECK(value == 5);
+}
+
+TEST(calc_bad_tokens_do_not_underflow) {
+    using K = CalcToken::Kind;
+    const std::vector<std::vector<CalcToken>> cases = {
+        {},
+        {{K::Plus, 0}},
+        {{K::RParen, 0}},
+        {{K::Number, 1}, {K::Plus, 0}},
+        {{K::LParen, 0}, {K::Number, 1}},
+        {{K::Number, 1}, {K::RParen, 0}},
+        {{K::LParen, 0}, {K::RParen, 0}},
+        {{K::Number, 1}, {K::Number, 2}},
+        {{K::Number, 1}, {K::LParen, 0}, {K::Number, 2}, {K::RParen, 0}},
+        {{K::Number, 1}, {K::Plus, 0}, {K::Times, 0}, {K::Number, 2}},
+    };
+    for (const auto& tokens : cases) {
+        double value = 123;
+        std::string error;
+        CHECK(!calc_evaluate(tokens, &value, &error));
+        CHECK(!error.empty());
+        CHECK(value == 123);
+    }
+}
+
+TEST(calc_single_value_and_recovery) {
+    double value = 0;
+    std::string error;
+    CHECK(!eval("1/0", &value, &error));
+    REQUIRE(eval("-42.5", &value, &error));
+    CHECK(value == -42.5);
+    CHECK(error.empty());
+    REQUIRE(eval("0", &value, &error));
+    CHECK(value == 0);
+}
+
 int main(int argc, char** argv) { return mt::run_all(argc, argv); }
