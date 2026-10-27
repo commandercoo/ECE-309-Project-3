@@ -4,7 +4,7 @@
 
 **P2 code:** My own Conversation and SentinelScanner from Project 2.
 
-**Tools used:** CMake and Clang were used to build and test; Git keeps the milestones.
+**Tools used:** CMake, Clang, GCC, CTest, and sanitizers checked the code. Docker provided Linux, and Git.
 
 ## Bringing P2 along
 
@@ -51,7 +51,7 @@ A model asking for a forbidden path isn't a C++ bug. Returning false with a reas
 
 ## Checking it
 
-The registry tests check collisions, duplicates, destruction counts, and all 10,000 saved pointers after resizing. Path tests cover every required case, missing paths, and escapes through file tools and symlinks. Calculator tests cover precedence, bad tokens, 20,000 terms, and 5,000 nested parentheses. All 31 P3 cases pass.
+The registry tests check collisions, duplicates, destruction counts, and all 10,000 saved pointers after resizing. Path tests cover every required case, missing paths, and escapes through file tools and symlinks. Calculator tests cover precedence, bad tokens, 20,000 terms, and 5,000 nested parentheses. All 31 P3 cases pass. The October 27 Linux check also passed all 61 checks with warnings treated as errors, ASan, UBSan, and leak detection.
 
 ## What I'd change
 
