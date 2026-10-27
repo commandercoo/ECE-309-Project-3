@@ -4,7 +4,7 @@
 
 **P2 code:** My own Conversation and SentinelScanner from Project 2.
 
-**Tools used:** CMake, Clang, GCC, CTest, and sanitizers checked the code. Docker provided Linux, and Git.
+**Tools used:** CMake, Clang, GCC, CTest, and sanitizers checked the code. Docker provided Linux, and Git. OpenAI Sol was used to write testcases as well as to search up some implementation for certain project specifications. 
 
 ## Bringing P2 along
 
